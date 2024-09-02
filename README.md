@@ -48,6 +48,87 @@ En ambos casos se utiliza defer para asegurar que las conexiones se cierren una 
 
 ### Ejercicio N°5:
 
+La implementacion del protocolo se encuentra en la carpeta `shared/protocol` y es utilizada tanto por el cliente como por el servidor.
+
+El protocolo cuenta con 2 secciones:
+
+- Messages: Encargada de la serializacion y deserializacion de los datos.
+- Network: Encargada del Read y Write de los datos en el socket.
+
+#### Messages
+
+Los mensajes se definen como estructuras que implementan la interfaz `Message` y tienen que implementar los siguientes metodos:
+
+- `GetMessageType() MessageType`: Devuelve el tipo de mensaje.
+- `Encode() string`: Devuelve el mensaje serializado.
+- `Decode(data string) error`: Decodifica un string en un mensaje.
+
+`MessageType` es un enum que se utiliza para identificar el tipo de mensaje.
+
+#### Network
+
+La capa de network se encarga de la lectura y escritura de los mensajes en el socket. Para esto se utiliza la funcion `Send` para enviar un mensaje y `Receive` para recibir un mensaje.
+
+El payload de los mensajes cuenta con 3 partes:
+
+- `size`: 4 bytes que indican el tamaño del mensaje. Es necesario ya que el mensaje puede ser de un tamaño variable y este dato es usado para evitar short-reads y short-writes.
+- `messageType`: 4 bytes que indican el tipo de mensaje. Es necesario ya que el mensaje puede ser de un tipo variable y este dato es usado para deserializar el mensaje correctamente.
+- `data`: El mensaje serializado. Es el string que se le pasa a la funcion `Decode` de un struct que implemente la interfaz `Message` para deserializar el mensaje.
+
+`Send` recibe una conexion y un mensaje que implemente la interfaz `Message`, serializa el mensaje y lo envía a través del socket utilizando el protocolo definido anteriormente.
+
+`Receive` recibe una conexion y devuelve un struct llamado `ReceivedMessage` que contiene el tipo de mensaje, size y string recibido. Este struct es lo que devuelve la funcion `Receive` y en la logica del servidor se utiliza el `MessageType` para ejecutar el `Decode` del struct correspondiente.
+
+#### Mensajes implementados
+
+- `MessageBet`
+- `MessageBetAck`
+
+```go
+type MessageBet struct {
+	FirstName string
+	LastName  string
+	Document  string
+	Birthdate string
+	Number    string
+}
+
+type MessageBetAck struct {
+	MessageType int32
+}
+```
+
+#### Funcionamiento del cliente
+
+El cliente lee del archivo de configuracion los datos de la apuesta y los utiliza para crear un mensaje `MessageBet` que es enviado al servidor con `Send`.
+
+El servidor recibe el `ReceivedMessage` con el mensaje de apuesta utilizando `Receive`, verifica que el MessageType sea `MessageTypeBet` y lo decodifica utilizando el metodo `Decode` de `MessageBet`. Una vez decodificado, crea el `Bet` y guarda los datos en el csv para, finalmente, mandar un mensaje de confirmacion `MessageBetAck` con la funcion `Send`.
+
+El cliente recibe el mensaje de confirmacion utilizando `Receive` y decodificando luego de revisar que sea del tipo `MessageTypeAck`, lo imprime por pantalla y finaliza.
+
+#### Configuracion del cliente
+
+La apuesta del cliente se define en el archivo de configuracion `client/config.yaml` agregando un apartado `bet` y se utiliza para crear el mensaje `MessageBet` que es enviado al servidor.
+
+```yml
+bet:
+  firstName: "john"
+  lastName: "doe"
+  document: "43000000"
+  birthdate: "2002-01-04"
+  number: "1000"
+```
+
+Tambien se puede pisar cualquier valor con las variables de entorno:
+
+```bash
+export CLI_NOMBRE="juan"
+export CLI_APELLIDO="perez"
+export CLI_DOCUMENTO="43000000"
+export CLI_NACIMIENTO="2002-01-05"
+export CLI_NUMERO="1001"
+```
+
 ### Ejercicio N°6:
 
 ### Ejercicio N°7:
