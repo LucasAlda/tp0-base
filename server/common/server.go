@@ -12,6 +12,7 @@ var log = logging.MustGetLogger("log")
 
 type Server struct {
 	serverSocket *net.TCPListener
+	cancelled    bool
 }
 
 func NewServer(port int, listenBacklog int) (*Server, error) {
@@ -20,7 +21,12 @@ func NewServer(port int, listenBacklog int) (*Server, error) {
 		return nil, err
 	}
 
-	return &Server{serverSocket: serverSocket}, nil
+	return &Server{serverSocket: serverSocket, cancelled: false}, nil
+}
+
+func (s *Server) Close() {
+	s.cancelled = true
+	s.serverSocket.Close()
 }
 
 // Dummy Server loop
@@ -30,12 +36,18 @@ func NewServer(port int, listenBacklog int) (*Server, error) {
 // finishes, servers starts to accept new connections again
 func (s *Server) Run() {
 	for {
-		clientSocket, err := s.acceptNewConnection()
+		err := s.acceptNewConnection()
+
+		if s.cancelled {
+			log.Debug("action: cancel_server | result: success")
+			return
+		}
+
 		if err != nil {
 			log.Errorf("action: accept_connections | result: fail | error: %s", err)
 			continue
 		}
-		s.handleClientConnection(clientSocket)
+
 	}
 }
 
@@ -44,8 +56,6 @@ func (s *Server) Run() {
 // If a problem arises in the communication with the client, the
 // client socket will also be closed
 func (s *Server) handleClientConnection(clientSocket *net.TCPConn) {
-	defer clientSocket.Close()
-
 	msg, err := bufio.NewReader(clientSocket).ReadString('\n')
 	if err != nil {
 		log.Error("Error reading client message: %s", err)
@@ -62,12 +72,17 @@ func (s *Server) handleClientConnection(clientSocket *net.TCPConn) {
 	// clientSocket.Write(msg)
 }
 
-func (s *Server) acceptNewConnection() (*net.TCPConn, error) {
+func (s *Server) acceptNewConnection() error {
 	log.Info("action: accept_connections | result: in_progress")
+
 	clientSocket, err := s.serverSocket.AcceptTCP()
 	if err != nil {
-		return nil, err
+		return err
 	}
+
 	log.Infof("action: accept_connections | result: success | ip: %s", clientSocket.RemoteAddr())
-	return clientSocket, nil
+
+	defer clientSocket.Close()
+	s.handleClientConnection(clientSocket)
+	return nil
 }

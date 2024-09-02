@@ -1,6 +1,11 @@
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/server/common"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/shared"
 	"github.com/op/go-logging"
@@ -76,6 +81,14 @@ func main() {
 	if err != nil {
 		log.Criticalf("Error creating server: %s", err)
 	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		server.Close()
+	}()
 
 	server.Run()
 }
