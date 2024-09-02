@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -20,74 +18,54 @@ var log = logging.MustGetLogger("log")
 // config file ./config.yaml. Environment variables takes precedence over parameters
 // defined in the configuration file. If some of the variables cannot be parsed,
 // an error is returned
-func InitConfig() (*viper.Viper, error) {
+func InitConfig() (*common.Config, error) {
 	v := viper.New()
 
 	// Configure viper to read env variables with the CLI_ prefix
-	v.AutomaticEnv()
-	v.SetEnvPrefix("cli")
-	// Use a replacer to replace env variables underscores with points. This let us
-	// use nested configurations in the config file and at the same time define
-	// env variables for the nested configurations
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.BindEnv("id", "CLI_ID")
+	v.BindEnv("server.address", "CLI_SERVER_ADDRESS")
+	v.BindEnv("loop.period", "CLI_LOOP_PERIOD")
+	v.BindEnv("loop.amount", "CLI_LOOP_AMOUNT")
+	v.BindEnv("log.level", "CLI_LOG_LEVEL")
 
-	// Add env variables supported
-	v.BindEnv("id")
-	v.BindEnv("server", "address")
-	v.BindEnv("loop", "period")
-	v.BindEnv("loop", "amount")
-	v.BindEnv("log", "level")
-
-	// Try to read configuration from config file. If config file
-	// does not exists then ReadInConfig will fail but configuration
-	// can be loaded from the environment variables so we shouldn't
-	// return an error in that case
 	v.SetConfigFile("./config.yaml")
 	if err := v.ReadInConfig(); err != nil {
 		fmt.Printf("Configuration could not be read from config file. Using env variables instead")
 	}
 
-	// Parse time.Duration variables and return an error if those variables cannot be parsed
-
-	if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
+	config := common.Config{}
+	if err := v.Unmarshal(&config); err != nil {
 		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
 	}
 
-	return v, nil
+	return &config, nil
 }
 
 // PrintConfig Print all the configuration parameters of the program.
 // For debugging purposes only
-func PrintConfig(v *viper.Viper) {
+func PrintConfig(config *common.Config) {
 	log.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_amount: %v | loop_period: %v | log_level: %s",
-		v.GetString("id"),
-		v.GetString("server.address"),
-		v.GetInt("loop.amount"),
-		v.GetDuration("loop.period"),
-		v.GetString("log.level"),
+		config.ID,
+		config.Server.Address,
+		config.Loop.Amount,
+		config.Loop.Period,
+		config.Log.Level,
 	)
 }
 
 func main() {
-	v, err := InitConfig()
+	config, err := InitConfig()
 	if err != nil {
 		log.Criticalf("%s", err)
 	}
 
-	if err := shared.InitLogger(v.GetString("log.level")); err != nil {
+	if err := shared.InitLogger(config.Log.Level); err != nil {
 		log.Criticalf("%s", err)
 	}
 
 	// Print program config with debugging purposes
-	PrintConfig(v)
+	PrintConfig(config)
 
-	clientConfig := common.ClientConfig{
-		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
-		LoopAmount:    v.GetInt("loop.amount"),
-		LoopPeriod:    v.GetDuration("loop.period"),
-	}
-
-	client := common.NewClient(clientConfig)
+	client := common.NewClient(*config)
 	client.StartClientLoop()
 }

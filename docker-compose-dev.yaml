@@ -6,6 +6,7 @@ services:
     entrypoint: /server
     environment:
       - LOGGING_LEVEL=DEBUG
+      - SERVER_PORT=8080
     networks:
       - testing_net
 
@@ -16,6 +17,7 @@ services:
     environment:
       - CLI_ID=1
       - CLI_LOG_LEVEL=DEBUG
+      - CLI_SERVER_ADDRESS=server:8080
     networks:
       - testing_net
     depends_on:

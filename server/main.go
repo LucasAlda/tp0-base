@@ -9,10 +9,10 @@ import (
 )
 
 type IniData struct {
-	Default Env
+	Default Config
 }
 
-type Env struct {
+type Config struct {
 	ServerPort          int    `mapstructure:"SERVER_PORT"`
 	ServerIp            string `mapstructure:"SERVER_IP"`
 	ServerListenBacklog int    `mapstructure:"SERVER_LISTEN_BACKLOG"`
@@ -21,7 +21,7 @@ type Env struct {
 
 var log = logging.MustGetLogger("log")
 
-func initializeConfig() *Env {
+func initializeConfig() *Config {
 	v := viper.New()
 	_ = v.BindEnv("default.server_port", "SERVER_PORT")
 	_ = v.BindEnv("default.server_ip", "SERVER_IP")
@@ -58,9 +58,9 @@ func initializeConfig() *Env {
 
 // PrintConfig Print all the configuration parameters of the program.
 // For debugging purposes only
-func PrintConfig(env *Env) {
+func PrintConfig(config *Config) {
 
-	log.Debugf("action: config | result: success | port: %d | listen_backlog: %d | logging_level: %s", env.ServerPort, env.ServerListenBacklog, env.LoggingLevel)
+	log.Debugf("action: config | result: success | port: %d | listen_backlog: %d | logging_level: %s", config.ServerPort, config.ServerListenBacklog, config.LoggingLevel)
 }
 
 func main() {
