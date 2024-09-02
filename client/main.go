@@ -32,6 +32,12 @@ func InitConfig() (*common.Config, error) {
 	v.BindEnv("loop.amount", "CLI_LOOP_AMOUNT")
 	v.BindEnv("log.level", "CLI_LOG_LEVEL")
 
+	v.BindEnv("bet.firstName", "CLI_BET_FIRST_NAME")
+	v.BindEnv("bet.lastName", "CLI_BET_LAST_NAME")
+	v.BindEnv("bet.document", "CLI_BET_DOCUMENT")
+	v.BindEnv("bet.birthdate", "CLI_BET_BIRTHDATE")
+	v.BindEnv("bet.number", "CLI_BET_NUMBER")
+
 	v.SetConfigFile("./config.yaml")
 	if err := v.ReadInConfig(); err != nil {
 		fmt.Printf("Configuration could not be read from config file. Using env variables instead")
@@ -41,6 +47,8 @@ func InitConfig() (*common.Config, error) {
 	if err := v.Unmarshal(&config); err != nil {
 		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
 	}
+
+	fmt.Printf("config: %v\n", config.Bet)
 
 	return &config, nil
 }

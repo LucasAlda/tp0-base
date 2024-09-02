@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/shared/protocol"
 	"github.com/op/go-logging"
 )
 
@@ -30,6 +31,8 @@ type Config struct {
 	Server ServerConfig `mapstructure:"server"`
 	Loop   LoopConfig   `mapstructure:"loop"`
 	Log    LogConfig    `mapstructure:"log"`
+
+	Bet protocol.MessageBet `mapstructure:"bet"`
 }
 
 // Client Entity that encapsulates how
