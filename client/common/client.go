@@ -82,7 +82,6 @@ func (c *Client) StartClientLoop(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			log.Infof("action: loop_finished | result: cancelled | client_id: %v", c.config.ID)
 			c.cancel()
 			return
 		case <-time.After(c.config.Loop.Period):
