@@ -10,6 +10,14 @@ Para la migracion se mantuvo la arquitectura original, respetando archivos, func
 
 ### Ejercicio N°1:
 
+Para generar los archivos de docker-compose.yaml se utilizó el script `generar-compose.sh` que se encuentra en la raíz del proyecto. Este script recibe como parámetros el archivo de configuración y la cantidad de clientes a levantar.
+
+Cuando se ejecuta el script de bash, se corre el go encontrado en `scripts/docker-compose-generator.go`, por lo que es necesario tener instalado go en el sistema host.
+
+```bash
+./generar-compose.sh docker-compose-dev.yaml 5
+```
+
 ### Ejercicio N°2:
 
 ### Ejercicio N°3:
