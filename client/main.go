@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -67,5 +71,10 @@ func main() {
 	PrintConfig(config)
 
 	client := common.NewClient(*config)
-	client.StartClientLoop()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	defer stop()
+
+	client.StartClientLoop(ctx)
+
 }
