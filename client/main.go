@@ -1,11 +1,7 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -48,8 +44,6 @@ func InitConfig() (*common.Config, error) {
 		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
 	}
 
-	fmt.Printf("config: %v\n", config.Bet)
-
 	return &config, nil
 }
 
@@ -80,9 +74,9 @@ func main() {
 
 	client := common.NewClient(*config)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-	defer stop()
+	// ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	// defer stop()
 
-	client.StartClientLoop(ctx)
+	client.SendBet(config.Bet)
 
 }

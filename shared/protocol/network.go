@@ -6,7 +6,8 @@ import (
 )
 
 func Send(conn net.Conn, m Message) error {
-	size := m.GetSize()
+	data := m.Encode()
+	size := int32(len(data))
 
 	err := binary.Write(conn, binary.LittleEndian, size)
 	if err != nil {
@@ -19,8 +20,6 @@ func Send(conn net.Conn, m Message) error {
 	}
 
 	wrote := 0
-	data := m.Encode()
-
 	for wrote < len(data) {
 		n, err := conn.Write([]byte(data[wrote:]))
 		if err != nil {
@@ -46,14 +45,12 @@ func Receive(conn net.Conn) (*ReceivedMessage, error) {
 	size := int32(0)
 	err := binary.Read(conn, binary.LittleEndian, &size)
 	if err != nil {
-		println("Error reading size: ", err.Error())
 		return nil, err
 	}
 
 	messageType := int32(0)
 	err = binary.Read(conn, binary.LittleEndian, &messageType)
 	if err != nil {
-		println("Error reading type: ", err.Error())
 		return nil, err
 	}
 

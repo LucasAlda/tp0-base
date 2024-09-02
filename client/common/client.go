@@ -1,9 +1,7 @@
 package common
 
 import (
-	"bufio"
-	"context"
-	"fmt"
+	"errors"
 	"net"
 	"time"
 
@@ -75,46 +73,39 @@ func (c *Client) close() {
 	c.conn.Close()
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop(ctx context.Context) {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.Loop.Amount; msgID++ {
-		// Create the connection and send the message
-		c.sendMessage(msgID)
-
-		select {
-		case <-ctx.Done():
-			c.cancel()
-			return
-		case <-time.After(c.config.Loop.Period):
-		}
-
-	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-}
-
-func (c *Client) sendMessage(id int) {
+func (c *Client) SendBet(bet protocol.MessageBet) {
 	c.createClientSocket()
 	defer c.close()
 
-	fmt.Fprintf(
-		c.conn,
-		"[CLIENT %v] Message N°%v\n",
-		c.config.ID,
-		id,
-	)
-	msg, err := bufio.NewReader(c.conn).ReadString('\n')
-
-	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
+	if err := protocol.Send(c.conn, &bet); err != nil {
+		handleFailedBet(bet, err)
+		return
 	}
 
-	log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-		c.config.ID,
-		msg,
+	msg, err := protocol.Receive(c.conn)
+	if err != nil || msg.MessageType != protocol.MessageTypeBetAck {
+		handleFailedBet(bet, err)
+		return
+	}
+
+	betAck := protocol.MessageBetAck{}
+	err = betAck.Decode(msg.Data)
+	if err != nil {
+		handleFailedBet(bet, err)
+		return
+	}
+
+	if betAck.Result {
+		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", bet.Document, bet.Number)
+	} else {
+		handleFailedBet(bet, errors.New("El servidor no almacenó la apuesta"))
+	}
+}
+
+func handleFailedBet(bet protocol.MessageBet, err error) {
+	log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v | error: %v",
+		bet.Document,
+		bet.Number,
+		err,
 	)
 }

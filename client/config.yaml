@@ -11,6 +11,6 @@ batch:
 bet:
   firstName: "john"
   lastName: "doe"
-  document: 43000000
+  document: "43000000"
   birthdate: "2002-01-04"
-  number: 1000
+  number: "1000"
