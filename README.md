@@ -36,6 +36,14 @@ El script valida que el servidor en la network del `docker-compose-dev.yaml` esc
 
 ### Ejercicio N°4:
 
+Para agregar el graceful shutdown tanto en el cliente como en el servidor se utilizó el paquete `os/signal` para capturar las señales de interrupción y terminar los loops de los respectivos servicios.
+
+En el servidor se utiliza el context para que una vez este es cancelado, cierre el listener y finalice el loop de aceptar nuevas conexiones y el programa finalice correctamente una vez que la conexion actual termina.
+
+En el cliente se reemplaza el time.Sleep por un select entre el contexto y un time.After, de forma que si el contexto se cancela, el select case se ejecuta y proceso termina correctamente, caso contrario se queda esperando que el tiempo de sleep termine y se vuelve a ejecutar el loop.
+
+En ambos casos se utiliza defer para asegurar que las conexiones se cierren una vez terminado su closure, en el cliente se cierra cuando termina la funcion `sendMessage` y en el servidor se cierra cuando termina el handle de la nueva conexion.
+
 ## Parte 2: Repaso de Comunicaciones
 
 ### Ejercicio N°5:
