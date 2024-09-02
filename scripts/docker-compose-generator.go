@@ -14,8 +14,6 @@ services:
     container_name: server
     image: server:latest
     entrypoint: /server
-    environment:
-      - LOGGING_LEVEL=DEBUG
     volumes:
       - ./server/config.ini:/config.ini
     networks:
@@ -31,7 +29,6 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID=%d
-      - CLI_LOG_LEVEL=DEBUG
     volumes:
       - ./client/config.yaml:/config.yaml
     networks:
