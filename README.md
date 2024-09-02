@@ -20,6 +20,10 @@ Cuando se ejecuta el script de bash, se corre el go encontrado en `scripts/docke
 
 ### Ejercicio N°2:
 
+Para permitir editar los archivos de configuración dentro del contenedor sin necesidad de volver a generar la imagen, se utilizó volumes para montar los archivos en el contenedor.
+
+Estos volúmenes se encuentran definidos en el docker compose y montan en los contenedores indicados el archivo de configuración ubicado en la raíz del proyecto, de manera que no hay que mover los archivos de lugar y es transparente para el usuario.
+
 ### Ejercicio N°3:
 
 ### Ejercicio N°4:
