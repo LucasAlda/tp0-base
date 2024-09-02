@@ -26,6 +26,14 @@ Estos volúmenes se encuentran definidos en el docker compose y montan en los co
 
 ### Ejercicio N°3:
 
+Para validar el funcionamiento del servidor se utilizó el script `validar-echo-server.sh` que se encuentra en la raíz del proyecto. Este script se ejecuta en el contenedor de alpine y se encarga de probar el servidor con netcat.
+
+El script valida que el servidor en la network del `docker-compose-dev.yaml` escuchando en `server:12345` responda con "ping" cuando se le envía "ping". Para esto se utiliza el contenedor de alpine como un cliente netcat que se conecta al servidor para evitar que el usuario tenga que instalar netcat en su sistema.
+
+```bash
+./validar-echo-server.sh
+```
+
 ### Ejercicio N°4:
 
 ## Parte 2: Repaso de Comunicaciones
