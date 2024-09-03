@@ -8,8 +8,9 @@ import (
 type MessageType int32
 
 const (
-	MessageTypeBet MessageType = iota
+	MessageTypeBetBatch MessageType = iota
 	MessageTypeBetAck
+	MessageTypeAllBetsSent
 )
 
 // Protocolo de comunicacion entre cliente y servidor
@@ -29,10 +30,6 @@ type MessageBet struct {
 	Number    string
 }
 
-func (m *MessageBet) GetMessageType() MessageType {
-	return MessageTypeBet
-}
-
 func (m *MessageBet) Encode() string {
 	return m.FirstName + "," + m.LastName + "," + m.Document + "," + m.Birthdate + "," + m.Number
 }
@@ -45,6 +42,43 @@ func (m *MessageBet) Decode(data string) error {
 	m.Birthdate = values[3]
 	m.Number = values[4]
 
+	return nil
+}
+
+func (m *MessageBet) GetSize() int {
+	return len(m.FirstName) + len(m.LastName) + len(m.Document) + len(m.Birthdate) + len(m.Number) + 4
+}
+
+type MessageBetBatch struct {
+	Bets []MessageBet
+}
+
+func (m *MessageBetBatch) GetMessageType() MessageType {
+	return MessageTypeBetBatch
+}
+
+func (m *MessageBetBatch) Encode() string {
+	encodedBets := make([]string, len(m.Bets))
+	for i, bet := range m.Bets {
+		encodedBets[i] = bet.Encode()
+	}
+	return strings.Join(encodedBets, "|")
+}
+
+func (m *MessageBetBatch) Decode(data string) error {
+	values := strings.Split(data, "|")
+	bets := make([]MessageBet, len(values))
+
+	for i, value := range values {
+		bet := MessageBet{}
+		err := bet.Decode(value)
+		if err != nil {
+			return err
+		}
+		bets[i] = bet
+	}
+
+	m.Bets = bets
 	return nil
 }
 
@@ -67,5 +101,21 @@ func (m *MessageBetAck) Decode(data string) error {
 		return err
 	}
 	m.Result = result
+	return nil
+}
+
+// MessageBetAck is a struct that represents a bet ack message
+type MessageAllBetsSent struct {
+}
+
+func (m *MessageAllBetsSent) GetMessageType() MessageType {
+	return MessageTypeAllBetsSent
+}
+
+func (m *MessageAllBetsSent) Encode() string {
+	return ""
+}
+
+func (m *MessageAllBetsSent) Decode(data string) error {
 	return nil
 }

@@ -1,7 +1,12 @@
 package main
 
 import (
+	"context"
+	"encoding/csv"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -27,12 +32,7 @@ func InitConfig() (*common.Config, error) {
 	v.BindEnv("loop.period", "CLI_LOOP_PERIOD")
 	v.BindEnv("loop.amount", "CLI_LOOP_AMOUNT")
 	v.BindEnv("log.level", "CLI_LOG_LEVEL")
-
-	v.BindEnv("bet.firstName", "CLI_NOMBRE")
-	v.BindEnv("bet.lastName", "CLI_APELLIDO")
-	v.BindEnv("bet.document", "CLI_DOCUMENTO")
-	v.BindEnv("bet.birthdate", "CLI_NACIMIENTO")
-	v.BindEnv("bet.number", "CLI_NUMERO")
+	v.BindEnv("batch.maxAmount", "CLI_BATCH_MAX_AMOUNT")
 
 	v.SetConfigFile("./config.yaml")
 	if err := v.ReadInConfig(); err != nil {
@@ -59,6 +59,25 @@ func PrintConfig(config *common.Config) {
 	)
 }
 
+func readAgencyFile() ([][]string, error) {
+	file, err := os.Open("./agency.csv")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	csvReader := csv.NewReader(file)
+	csvReader.FieldsPerRecord = -1
+
+	data, err := csvReader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+
+}
+
 func main() {
 	config, err := InitConfig()
 	if err != nil {
@@ -72,11 +91,21 @@ func main() {
 	// Print program config with debugging purposes
 	PrintConfig(config)
 
+	agencyData, err := readAgencyFile()
+	if err != nil {
+		log.Criticalf("Error reading agency file: %s", err)
+		return
+	}
+
 	client := common.NewClient(*config)
 
-	// ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-	// defer stop()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	defer stop()
 
-	client.SendBet(config.Bet)
+	go func() {
+		<-ctx.Done()
+		client.Cancel()
+	}()
 
+	client.SendBets(agencyData)
 }

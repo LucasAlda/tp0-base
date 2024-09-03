@@ -2,15 +2,8 @@ server:
   address: "server:12345"
 loop:
   amount: 5
-  period: "1s"
+  period: "10ms"
 log:
-  level: "INFO"
+  level: "DEBUG"
 batch:
-  maxAmount: 10
-
-bet:
-  firstName: "john"
-  lastName: "doe"
-  document: "43000000"
-  birthdate: "2002-01-04"
-  number: "1000"
+  maxAmount: 100

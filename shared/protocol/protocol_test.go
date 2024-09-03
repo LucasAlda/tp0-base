@@ -27,17 +27,18 @@ func TestSendAndReceiveBetMessage(t *testing.T) {
 			panic(err)
 		}
 
-		assert.Equal(t, received.MessageType, MessageTypeBet)
-		bet := MessageBet{}
+		assert.Equal(t, received.MessageType, MessageTypeBetBatch)
+		bet := MessageBetBatch{}
 		bet.Decode(received.Data)
 
 		println("Received bet message")
-		println("BET: ", bet.FirstName, bet.LastName, bet.Document, bet.Birthdate, bet.Number)
-		assert.Equal(t, bet.FirstName, "Juan")
-		assert.Equal(t, bet.LastName, "Perez")
-		assert.Equal(t, bet.Document, "1234567890")
-		assert.Equal(t, bet.Birthdate, "2000-01-01")
-		assert.Equal(t, bet.Number, "123456")
+		println("BET: ", bet.Bets[0].FirstName, bet.Bets[0].LastName, bet.Bets[0].Document, bet.Bets[0].Birthdate, bet.Bets[0].Number)
+		assert.Equal(t, len(bet.Bets), 1)
+		assert.Equal(t, bet.Bets[0].FirstName, "Juan")
+		assert.Equal(t, bet.Bets[0].LastName, "Perez")
+		assert.Equal(t, bet.Bets[0].Document, "1234567890")
+		assert.Equal(t, bet.Bets[0].Birthdate, "2000-01-01")
+		assert.Equal(t, bet.Bets[0].Number, "123456")
 	}()
 
 	conn, err := net.Dial("tcp", "localhost:8080")
@@ -46,7 +47,7 @@ func TestSendAndReceiveBetMessage(t *testing.T) {
 		panic(err)
 	}
 
-	msg := &MessageBet{
+	msg := MessageBet{
 		FirstName: "Juan",
 		LastName:  "Perez",
 		Document:  "1234567890",
@@ -54,7 +55,11 @@ func TestSendAndReceiveBetMessage(t *testing.T) {
 		Number:    "123456",
 	}
 
-	err = Send(conn, msg)
+	batch := MessageBetBatch{
+		Bets: []MessageBet{msg},
+	}
+
+	err = Send(conn, &batch)
 	if err != nil {
 		panic(err)
 	}

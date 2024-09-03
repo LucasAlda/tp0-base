@@ -31,11 +31,12 @@ services:
       - CLI_ID=%d
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./.data/dataset/agency-%d.csv:/agency.csv
     networks:
       - testing_net
     depends_on:
       - server
-`, i, i, i)
+`, i, i, i, i)
 		composeStr += clientStr
 	}
 
