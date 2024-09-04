@@ -83,7 +83,7 @@ func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
 		msg, err := protocol.Receive(conn)
 		// Si el reader devuelve EOF, el cliente se desconectó
 		if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-			log.Debugf("action: client_disconected | ip: %s", conn.RemoteAddr())
+			log.Errorf("action: client_disconected | ip: %s", conn.RemoteAddr())
 			return nil
 		}
 		// Si ocurre otro error, lo registramos

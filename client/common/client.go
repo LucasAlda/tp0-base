@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"io"
 	"net"
 	"time"
 
@@ -39,9 +40,8 @@ type Config struct {
 
 // Client Entity that encapsulates how
 type Client struct {
-	config    Config
-	conn      net.Conn
-	cancelled bool
+	config Config
+	conn   net.Conn
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -70,7 +70,6 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) Cancel() {
-	c.cancelled = true
 	c.close()
 	log.Debugf("action: close_connection | result: success | client_id: %v", c.config.ID)
 }
@@ -89,23 +88,17 @@ func (c *Client) SendBets(betsStr [][]string) {
 
 	for _, betsBatch := range batchs {
 		err := c.sendBetBatch(betsBatch)
-		if c.cancelled {
-			return
-		}
 		if err != nil {
-
 			return
 		}
+
 		time.Sleep(c.config.Loop.Period)
 	}
 
 	allBetsSent := protocol.MessageAllBetsSent{}
 	err := protocol.Send(c.conn, &allBetsSent)
-	if c.cancelled {
-		return
-	}
 	if err != nil {
-		log.Errorf("action: enviar_apuestas_totales | result: fail | error: %v", err)
+		log.Errorf("action: server_disconnected")
 		return
 	}
 
@@ -158,18 +151,17 @@ func (c *Client) batchBets(bets []protocol.MessageBet) []protocol.MessageBetBatc
 func (c *Client) sendBetBatch(bet protocol.MessageBetBatch) error {
 
 	err := protocol.Send(c.conn, &bet)
-	if c.cancelled {
-		return errors.New("Client cancelled")
-	}
 	if err != nil {
+		log.Errorf("action: server_disconnected")
 		return err
 	}
 
 	msg, err := protocol.Receive(c.conn)
-	if err != nil {
-		return errors.New("Client cancelled")
+	if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+		log.Errorf("action: server_disconnected")
+		return err
 	}
-	if msg.MessageType != protocol.MessageTypeBetAck {
+	if err != nil || msg.MessageType != protocol.MessageTypeBetAck {
 		log.Infof("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
 		return err
 	}
@@ -177,14 +169,14 @@ func (c *Client) sendBetBatch(bet protocol.MessageBetBatch) error {
 	betAck := protocol.MessageBetAck{}
 	err = betAck.Decode(msg.Data)
 	if err != nil {
-		log.Infof("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
+		log.Errorf("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
 		return err
 	}
 
 	if betAck.Result {
 		log.Infof("action: apuesta_enviada | result: success | cantidad: %d", len(bet.Bets))
 	} else {
-		log.Infof("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
+		log.Errorf("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
 		return errors.New("El servidor no almacenó la apuesta")
 	}
 
