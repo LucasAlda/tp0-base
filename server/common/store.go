@@ -54,9 +54,9 @@ func (b *Bet) HasWon() bool {
 }
 
 func StoreBets(bets []*Bet) error {
-	file, err := os.Create(STORAGE_FILEPATH)
+	file, err := os.OpenFile(STORAGE_FILEPATH, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %v", err)
+		return fmt.Errorf("failed to open file: %v", err)
 	}
 	defer file.Close()
 

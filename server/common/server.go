@@ -95,10 +95,10 @@ func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
 		switch msg.MessageType {
 
 		case protocol.MessageTypeBetBatch:
-			s.handleNewBet(conn, agencyId, msg)
+			s.handleNewBets(conn, agencyId, msg)
 
 		case protocol.MessageTypeAllBetsSent:
-			log.Info("action: all_bets_sent | result: success")
+			log.Info("action: all_bets_received | result: success")
 			return nil
 
 		default:
@@ -108,7 +108,7 @@ func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
 	}
 }
 
-func (s *Server) handleNewBet(conn *net.TCPConn, agencyId int, msg *protocol.ReceivedMessage) {
+func (s *Server) handleNewBets(conn *net.TCPConn, agencyId int, msg *protocol.ReceivedMessage) {
 
 	if msg.MessageType != protocol.MessageTypeBetBatch {
 		handleFailedBetBatch(conn, protocol.MessageBetBatch{}, errors.New("Mensaje recibido no es una apuesta"))
