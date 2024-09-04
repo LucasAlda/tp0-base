@@ -131,6 +131,21 @@ export CLI_NUMERO="1001"
 
 ### Ejercicio N°6:
 
+Para implementar el envio de multiples apuestas en batch no se tuvo que alterar tanto la logica del cliente como del servidor, mostrando una buena encapsulamiento de la capa de network. Para esto se creó un mensaje `MessageBetBatch` que contiene un slice de `MessageBet` y un `MessageAllBetsSent` que es enviado al servidor cuando el cliente termina de enviar todas las apuestas.
+
+El servidor ahora tiene un loop infinito que acepta nuevas conexiones y las agrega a la lista de clientes. Este loop utiliza `Receive` para obtener un `ReceivedMessage` del cliente, y es esta abstraccion la que permite que el servidor
+haga un switch sobre el MessageType y se encarge de procesar los batchs de apuestas y los `MessageAllBetsSent` dependiendo del caso.
+
+Por cada `MessageBetBatch` que llega al servidor, este es decodificado y los bets son agregados a una lista de apuestas. Cuando se llega al final del batch, se procesan las apuestas, se hace el append al archivo csv y se envía un `MessageBetAck` al cliente.
+
+Cuando el servidor recibe un `MessageAllBetsSent` este es procesado y se desconecta el cliente para proceder con el sigiuente.
+
+Con el siguiente comando se puede validar un `wc` al archivo `bets.csv` que se encuentra en el contenedor del servidor:
+
+```bash
+docker exec server wc bets.csv
+```
+
 ### Ejercicio N°7:
 
 ## Parte 3: Repaso de Concurrencia
