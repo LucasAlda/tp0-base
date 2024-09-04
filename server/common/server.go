@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"strconv"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/shared/protocol"
 	"github.com/op/go-logging"
@@ -14,7 +13,7 @@ var log = logging.MustGetLogger("log")
 
 type Server struct {
 	serverSocket *net.TCPListener
-	agencies     []*net.TCPConn
+	agencies     []*Client
 }
 
 func NewServer(port int, listenBacklog int) (*Server, error) {
@@ -30,7 +29,7 @@ func (s *Server) Close() {
 	s.serverSocket.Close()
 	for _, agency := range s.agencies {
 		if agency != nil {
-			agency.Close()
+			agency.conn.Close()
 		}
 	}
 }
@@ -43,13 +42,13 @@ func (s *Server) Close() {
 func (s *Server) Run() {
 	agencyId := 1
 	for {
-		conn, err := s.acceptNewConnection()
-		s.agencies = append(s.agencies, conn)
+		client, err := s.acceptNewConnection()
+		s.agencies = append(s.agencies, client)
 		if err != nil {
 			return
 		}
 
-		err = s.handleConnection(conn, agencyId)
+		err = s.handleConnection(client, agencyId)
 		if err != nil {
 			log.Errorf("action: handle_connection | result: fail | error: %s", err)
 		}
@@ -57,7 +56,7 @@ func (s *Server) Run() {
 	}
 }
 
-func (s *Server) acceptNewConnection() (*net.TCPConn, error) {
+func (s *Server) acceptNewConnection() (*Client, error) {
 	log.Info("action: accept_connections | result: in_progress")
 
 	clientSocket, err := s.serverSocket.AcceptTCP()
@@ -71,31 +70,45 @@ func (s *Server) acceptNewConnection() (*net.TCPConn, error) {
 		return nil, err
 	}
 
-	log.Infof("action: accept_connections | result: success | ip: %s", clientSocket.RemoteAddr())
+	receivedMessage, err := protocol.Receive(clientSocket)
+	if err != nil || receivedMessage.MessageType != protocol.MessageTypePresentation {
+		log.Errorf("action: accept_connections | result: fail | error: %s", err)
+		return nil, err
+	}
 
-	return clientSocket, nil
+	presentation := protocol.MessagePresentation{}
+	err = presentation.Decode(receivedMessage.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	client := NewClient(clientSocket, presentation.Agency)
+
+	log.Infof("action: accept_connections | result: success | agency: %s", client.agency)
+
+	return client, nil
 }
 
-func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
-	defer conn.Close()
+func (s *Server) handleConnection(client *Client, agencyId int) error {
+	defer client.conn.Close()
 
 	for {
-		msg, err := protocol.Receive(conn)
+		msg, err := protocol.Receive(client.conn)
 		// Si el reader devuelve EOF, el cliente se desconectó
 		if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-			log.Errorf("action: client_disconected | ip: %s", conn.RemoteAddr())
+			log.Errorf("action: client_disconected | agency: %s", client.agency)
 			return nil
 		}
 		// Si ocurre otro error, lo registramos
 		if err != nil {
-			handleFailedBetBatch(conn, protocol.MessageBetBatch{}, err)
+			handleFailedBetBatch(client, protocol.MessageBetBatch{}, err)
 			return err
 		}
 
 		switch msg.MessageType {
 
 		case protocol.MessageTypeBetBatch:
-			s.handleNewBets(conn, agencyId, msg)
+			s.handleNewBets(client, msg)
 
 		case protocol.MessageTypeAllBetsSent:
 			log.Info("action: all_bets_received | result: success")
@@ -108,10 +121,10 @@ func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
 	}
 }
 
-func (s *Server) handleNewBets(conn *net.TCPConn, agencyId int, msg *protocol.ReceivedMessage) {
+func (s *Server) handleNewBets(client *Client, msg *protocol.ReceivedMessage) {
 
 	if msg.MessageType != protocol.MessageTypeBetBatch {
-		handleFailedBetBatch(conn, protocol.MessageBetBatch{}, errors.New("Mensaje recibido no es una apuesta"))
+		handleFailedBetBatch(client, protocol.MessageBetBatch{}, errors.New("Mensaje recibido no es una apuesta"))
 		return
 	}
 
@@ -123,9 +136,9 @@ func (s *Server) handleNewBets(conn *net.TCPConn, agencyId int, msg *protocol.Re
 
 	bets := make([]*Bet, 0)
 	for _, bet := range betsBatchMsg.Bets {
-		b, err := NewBet(strconv.Itoa(agencyId), bet.FirstName, bet.LastName, bet.Document, bet.Birthdate, bet.Number)
+		b, err := NewBet(client.agency, bet.FirstName, bet.LastName, bet.Document, bet.Birthdate, bet.Number)
 		if err != nil {
-			handleFailedBetBatch(conn, betsBatchMsg, err)
+			handleFailedBetBatch(client, betsBatchMsg, err)
 			return
 		}
 		bets = append(bets, b)
@@ -133,13 +146,13 @@ func (s *Server) handleNewBets(conn *net.TCPConn, agencyId int, msg *protocol.Re
 
 	err = StoreBets(bets)
 	if err != nil {
-		handleFailedBetBatch(conn, betsBatchMsg, err)
+		handleFailedBetBatch(client, betsBatchMsg, err)
 		return
 	}
 
 	betAck := protocol.MessageBetAck{Result: true}
 
-	error := protocol.Send(conn, &betAck)
+	error := protocol.Send(client.conn, &betAck)
 	if error != nil {
 		return
 	}
@@ -147,12 +160,21 @@ func (s *Server) handleNewBets(conn *net.TCPConn, agencyId int, msg *protocol.Re
 	log.Infof("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
 }
 
-func handleFailedBetBatch(clientSocket *net.TCPConn, bet protocol.MessageBetBatch, err error) {
+func handleFailedBetBatch(client *Client, bet protocol.MessageBetBatch, err error) {
 	// Si el error es de conexión cerrada, se termina el programa, si no, se envía un mensaje de error
 	if !errors.Is(err, io.EOF) || !errors.Is(err, net.ErrClosed) {
 		log.Errorf("action: apuesta_recibida | result: fail | cantidad: %d | error: %s", len(bet.Bets), err)
 	}
 
 	betAck := protocol.MessageBetAck{Result: false}
-	protocol.Send(clientSocket, &betAck)
+	protocol.Send(client.conn, &betAck)
+}
+
+type Client struct {
+	conn   *net.TCPConn
+	agency string
+}
+
+func NewClient(conn *net.TCPConn, agency string) *Client {
+	return &Client{conn: conn, agency: agency}
 }

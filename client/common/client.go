@@ -60,18 +60,32 @@ func (c *Client) createClientSocket() error {
 	conn, err := net.Dial("tcp", c.config.Server.Address)
 	if err != nil {
 		log.Criticalf(
-			"action: connect | result: fail | client_id: %v | error: %v",
+			"action: connect | result: fail | agency: %v | error: %v",
 			c.config.ID,
 			err,
 		)
 	}
+
+	presentation := protocol.MessagePresentation{
+		Agency: c.config.ID,
+	}
+	err = protocol.Send(conn, &presentation)
+	if err != nil {
+		log.Criticalf(
+			"action: connect | result: fail | agency: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return err
+	}
+
 	c.conn = conn
 	return nil
 }
 
 func (c *Client) Cancel() {
 	c.close()
-	log.Debugf("action: close_connection | result: success | client_id: %v", c.config.ID)
+	log.Debugf("action: close_connection | result: success | agency: %v", c.config.ID)
 }
 
 func (c *Client) close() {

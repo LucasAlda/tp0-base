@@ -8,7 +8,8 @@ import (
 type MessageType int32
 
 const (
-	MessageTypeBetBatch MessageType = iota
+	MessageTypePresentation MessageType = iota
+	MessageTypeBetBatch
 	MessageTypeBetAck
 	MessageTypeAllBetsSent
 )
@@ -117,5 +118,23 @@ func (m *MessageAllBetsSent) Encode() string {
 }
 
 func (m *MessageAllBetsSent) Decode(data string) error {
+	return nil
+}
+
+// MessageBetAck is a struct that represents a bet ack message
+type MessagePresentation struct {
+	Agency string
+}
+
+func (m *MessagePresentation) GetMessageType() MessageType {
+	return MessageTypePresentation
+}
+
+func (m *MessagePresentation) Encode() string {
+	return m.Agency
+}
+
+func (m *MessagePresentation) Decode(data string) error {
+	m.Agency = data
 	return nil
 }
