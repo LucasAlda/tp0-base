@@ -33,7 +33,6 @@ func (s *Server) Close() {
 			agency.Close()
 		}
 	}
-	log.Info("action: close_server | result: success")
 }
 
 // Dummy Server loop
@@ -46,15 +45,8 @@ func (s *Server) Run() {
 	for {
 		conn, err := s.acceptNewConnection()
 		s.agencies = append(s.agencies, conn)
-
-		if errors.Is(err, net.ErrClosed) {
-			log.Debug("action: cancel_server | result: success")
-			return
-		}
-
 		if err != nil {
-			log.Errorf("action: accept_connections | result: fail | error: %s", err)
-			continue
+			return
 		}
 
 		err = s.handleConnection(conn, agencyId)
@@ -69,7 +61,13 @@ func (s *Server) acceptNewConnection() (*net.TCPConn, error) {
 	log.Info("action: accept_connections | result: in_progress")
 
 	clientSocket, err := s.serverSocket.AcceptTCP()
+	// Si el error es que el socket ya está cerrado, simplemente terminamos el programa
+	if errors.Is(err, net.ErrClosed) {
+		return nil, err
+	}
+	// Si ocurre otro error, lo registramos
 	if err != nil {
+		log.Errorf("action: accept_connections | result: fail | error: %s", err)
 		return nil, err
 	}
 
@@ -83,9 +81,12 @@ func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
 
 	for {
 		msg, err := protocol.Receive(conn)
-		if errors.Is(err, io.EOF) {
+		// Si el reader devuelve EOF, el cliente se desconectó
+		if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+			log.Debugf("action: client_disconected | ip: %s", conn.RemoteAddr())
 			return nil
 		}
+		// Si ocurre otro error, lo registramos
 		if err != nil {
 			handleFailedBetBatch(conn, protocol.MessageBetBatch{}, err)
 			return err
@@ -103,7 +104,6 @@ func (s *Server) handleConnection(conn *net.TCPConn, agencyId int) error {
 		default:
 			log.Errorf("action: handle_message | result: fail | error: mensaje no soportado %s", msg.MessageType)
 			return errors.New("mensaje no soportado")
-
 		}
 	}
 }
@@ -118,7 +118,6 @@ func (s *Server) handleNewBet(conn *net.TCPConn, agencyId int, msg *protocol.Rec
 	betsBatchMsg := protocol.MessageBetBatch{}
 	err := betsBatchMsg.Decode(msg.Data)
 	if err != nil {
-		handleFailedBetBatch(conn, protocol.MessageBetBatch{}, errors.New("Error al decodificar la apuesta"))
 		return
 	}
 
@@ -142,7 +141,6 @@ func (s *Server) handleNewBet(conn *net.TCPConn, agencyId int, msg *protocol.Rec
 
 	error := protocol.Send(conn, &betAck)
 	if error != nil {
-		handleFailedBetBatch(conn, betsBatchMsg, error)
 		return
 	}
 
@@ -150,9 +148,11 @@ func (s *Server) handleNewBet(conn *net.TCPConn, agencyId int, msg *protocol.Rec
 }
 
 func handleFailedBetBatch(clientSocket *net.TCPConn, bet protocol.MessageBetBatch, err error) {
-	if !errors.Is(err, io.EOF) {
+	// Si el error es de conexión cerrada, se termina el programa, si no, se envía un mensaje de error
+	if !errors.Is(err, io.EOF) || !errors.Is(err, net.ErrClosed) {
 		log.Errorf("action: apuesta_recibida | result: fail | cantidad: %d | error: %s", len(bet.Bets), err)
 	}
+
 	betAck := protocol.MessageBetAck{Result: false}
 	protocol.Send(clientSocket, &betAck)
 }

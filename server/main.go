@@ -91,4 +91,6 @@ func main() {
 	}()
 
 	server.Run()
+
+	log.Info("action: close_server | result: success")
 }
