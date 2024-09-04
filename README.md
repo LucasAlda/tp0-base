@@ -140,6 +140,8 @@ Por cada `MessageBetBatch` que llega al servidor, este es decodificado y los bet
 
 Cuando el servidor recibe un `MessageAllBetsSent` este es procesado y se desconecta el cliente para proceder con el sigiuente.
 
+Como extra para almacenar las apuestas en el csv con el ID que tiene el cliente configurado, se creó un mensaje `MessagePresentation` que es enviado por el cliente al servidor con la presentacion del cliente y contiene el ID de la agencia. El servidor a la hora de aceptar nuevas conexiones espera este mensaje y de ahí en adelante utiliza un struct `Client` que almacea el ID de la agencia y el socket del cliente.
+
 Con el siguiente comando se puede validar un `wc` al archivo `bets.csv` que se encuentra en el contenedor del servidor:
 
 ```bash
