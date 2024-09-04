@@ -12,6 +12,7 @@ const (
 	MessageTypeBetBatch
 	MessageTypeBetAck
 	MessageTypeAllBetsSent
+	MessageTypeWinners
 )
 
 // Protocolo de comunicacion entre cliente y servidor
@@ -121,7 +122,7 @@ func (m *MessageAllBetsSent) Decode(data string) error {
 	return nil
 }
 
-// MessageBetAck is a struct that represents a bet ack message
+// MessagePresentation is a struct that represents the info a client sen
 type MessagePresentation struct {
 	Agency string
 }
@@ -136,5 +137,23 @@ func (m *MessagePresentation) Encode() string {
 
 func (m *MessagePresentation) Decode(data string) error {
 	m.Agency = data
+	return nil
+}
+
+// MessageWinners is a struct that represents a list of the winners from an agency
+type MessageWinners struct {
+	Winners []string
+}
+
+func (m *MessageWinners) GetMessageType() MessageType {
+	return MessageTypeWinners
+}
+
+func (m *MessageWinners) Encode() string {
+	return strings.Join(m.Winners, ",")
+}
+
+func (m *MessageWinners) Decode(data string) error {
+	m.Winners = strings.Split(data, ",")
 	return nil
 }

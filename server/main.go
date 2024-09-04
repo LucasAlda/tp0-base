@@ -22,6 +22,7 @@ type Config struct {
 	ServerIp            string `mapstructure:"SERVER_IP"`
 	ServerListenBacklog int    `mapstructure:"SERVER_LISTEN_BACKLOG"`
 	LoggingLevel        string `mapstructure:"LOGGING_LEVEL"`
+	CantAgencies        int    `mapstructure:"CANT_AGENCIES"`
 }
 
 var log = logging.MustGetLogger("log")
@@ -32,6 +33,7 @@ func initializeConfig() *Config {
 	_ = v.BindEnv("default.server_ip", "SERVER_IP")
 	_ = v.BindEnv("default.server_listen_backlog", "SERVER_LISTEN_BACKLOG")
 	_ = v.BindEnv("default.logging_level", "LOGGING_LEVEL")
+	_ = v.BindEnv("default.cant_agencies", "CANT_AGENCIES")
 
 	v.SetConfigFile("config.ini")
 
@@ -58,6 +60,10 @@ func initializeConfig() *Config {
 		log.Fatal("SERVER_LISTEN_BACKLOG is not set")
 	}
 
+	if iniData.Default.CantAgencies == 0 {
+		log.Fatal("CANT_AGENCIES is not set")
+	}
+
 	return &iniData.Default
 }
 
@@ -77,7 +83,7 @@ func main() {
 
 	PrintConfig(env)
 
-	server, err := common.NewServer(env.ServerPort, env.ServerListenBacklog)
+	server, err := common.NewServer(env.ServerPort, env.ServerListenBacklog, env.CantAgencies)
 	if err != nil {
 		log.Criticalf("Error creating server: %s", err)
 	}

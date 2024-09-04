@@ -98,6 +98,7 @@ func main() {
 	}
 
 	client := common.NewClient(*config)
+	defer client.Close()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
 	defer stop()
@@ -108,4 +109,5 @@ func main() {
 	}()
 
 	client.SendBets(agencyData)
+	client.GetWinners()
 }

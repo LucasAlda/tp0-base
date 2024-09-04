@@ -8,17 +8,19 @@ import (
 
 func generateDockerCompose(filename string, numClients int) {
 	// Base structure of the docker-compose file
-	composeStr := `name: tp0
+	composeStr := fmt.Sprintf(`name: tp0
 services:
   server:
     container_name: server
     image: server:latest
     entrypoint: /server
+    environment:
+      - CANT_AGENCIES=%d
     volumes:
       - ./server/config.ini:/config.ini
     networks:
       - testing_net
-`
+`, numClients)
 
 	// Generate client services
 	for i := 1; i <= numClients; i++ {

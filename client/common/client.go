@@ -84,17 +84,16 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) Cancel() {
-	c.close()
-	log.Debugf("action: close_connection | result: success | agency: %v", c.config.ID)
+	c.Close()
+	log.Debugf("action: cerrar_conexion | result: success | agency: %v", c.config.ID)
 }
 
-func (c *Client) close() {
+func (c *Client) Close() {
 	c.conn.Close()
 }
 
 func (c *Client) SendBets(betsStr [][]string) {
 	c.createClientSocket()
-	defer c.close()
 
 	bets := c.createBets(betsStr)
 
@@ -108,14 +107,36 @@ func (c *Client) SendBets(betsStr [][]string) {
 
 		time.Sleep(c.config.Loop.Period)
 	}
+}
+
+func (c *Client) GetWinners() {
+	log.Infof("action: consulta_ganadores | result: in_progress")
 
 	allBetsSent := protocol.MessageAllBetsSent{}
 	err := protocol.Send(c.conn, &allBetsSent)
 	if err != nil {
-		log.Errorf("action: server_disconnected")
+		log.Errorf("action: servidor_desconectado")
 		return
 	}
 
+	receivedMsg, err := protocol.Receive(c.conn)
+	if err != nil {
+		log.Errorf("action: servidor_desconectado")
+		return
+	}
+	if receivedMsg.MessageType != protocol.MessageTypeWinners {
+		log.Errorf("action: consulta_ganadores | result: fail | error: message type mismatch")
+		return
+	}
+
+	winners := protocol.MessageWinners{}
+	err = winners.Decode(receivedMsg.Data)
+	if err != nil {
+		log.Errorf("action: consulta_ganadores | result: fail | error: %s", err)
+		return
+	}
+
+	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners.Winners))
 }
 
 func (c *Client) createBets(betsStr [][]string) []protocol.MessageBet {
@@ -166,13 +187,13 @@ func (c *Client) sendBetBatch(bet protocol.MessageBetBatch) error {
 
 	err := protocol.Send(c.conn, &bet)
 	if err != nil {
-		log.Errorf("action: server_disconnected")
+		log.Errorf("action: servidor_desconectado")
 		return err
 	}
 
 	msg, err := protocol.Receive(c.conn)
 	if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-		log.Errorf("action: server_disconnected")
+		log.Errorf("action: servidor_desconectado")
 		return err
 	}
 	if err != nil || msg.MessageType != protocol.MessageTypeBetAck {
