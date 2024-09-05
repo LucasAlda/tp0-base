@@ -84,6 +84,7 @@ func main() {
 	PrintConfig(env)
 
 	server, err := common.NewServer(env.ServerPort, env.ServerListenBacklog, env.CantAgencies)
+
 	if err != nil {
 		log.Criticalf("Error creating server: %s", err)
 	}

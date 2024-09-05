@@ -16,6 +16,7 @@ type Server struct {
 	serverSocket *net.TCPListener
 	agencies     []*Client
 	cantAgencies int
+	cancelled    bool
 }
 
 func NewServer(port int, listenBacklog int, cantAgencies int) (*Server, error) {
@@ -28,6 +29,7 @@ func NewServer(port int, listenBacklog int, cantAgencies int) (*Server, error) {
 }
 
 func (s *Server) Close() {
+	s.cancelled = true
 	s.serverSocket.Close()
 	for _, agency := range s.agencies {
 		if agency != nil {
@@ -42,7 +44,9 @@ func (s *Server) Close() {
 // communication with a client. After client with communucation
 // finishes, servers starts to accept new connections again
 func (s *Server) Run() {
+	defer s.Close()
 	for i := 0; i < s.cantAgencies; i++ {
+
 		client, err := s.acceptNewConnection()
 		s.agencies = append(s.agencies, client)
 		if err != nil {
@@ -52,7 +56,9 @@ func (s *Server) Run() {
 		s.handleConnection(client)
 	}
 
-	s.handleWinners()
+	if !s.cancelled && len(s.agencies) > 0 {
+		s.handleWinners()
+	}
 }
 
 func (s *Server) acceptNewConnection() (*Client, error) {
@@ -91,14 +97,8 @@ func (s *Server) acceptNewConnection() (*Client, error) {
 func (s *Server) handleConnection(client *Client) {
 	for {
 		msg, err := protocol.Receive(client.conn)
-		// Si el reader devuelve EOF, el cliente se desconectó
-		if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-			log.Errorf("action: cliente_desconectado | agency: %d", client.agency)
-			return
-		}
-		// Si ocurre otro error, lo registramos
 		if err != nil {
-			handleFailedBetBatch(client, protocol.MessageBetBatch{}, err)
+			s.handleDisconnect(client, err)
 			return
 		}
 
@@ -116,40 +116,6 @@ func (s *Server) handleConnection(client *Client) {
 			return
 		}
 	}
-}
-
-func (s *Server) handleWinners() {
-	log.Infof("action: sorteo | result: in_progress")
-	bets, err := LoadBets()
-	if err != nil {
-		log.Errorf("action: sorteo | result: fail | error: %s", err)
-		return
-	}
-
-	all_winners := make([]*Bet, 0)
-	for _, bet := range bets {
-		if bet.HasWon() {
-			all_winners = append(all_winners, bet)
-		}
-	}
-
-	for _, client := range s.agencies {
-		agency_winners := make([]string, 0)
-		for _, winner := range all_winners {
-			if winner.agency == client.agency {
-				agency_winners = append(agency_winners, winner.document)
-			}
-		}
-
-		winnersMsg := protocol.MessageWinners{Winners: agency_winners}
-		err := protocol.Send(client.conn, &winnersMsg)
-		if err != nil {
-			log.Errorf("action: sorteo | result: fail | agency: %d | error: %s", client.agency, err)
-			return
-		}
-	}
-
-	log.Infof("action: sorteo | result: success")
 }
 
 func (s *Server) handleNewBets(client *Client, msg *protocol.ReceivedMessage) {
@@ -190,6 +156,59 @@ func (s *Server) handleNewBets(client *Client, msg *protocol.ReceivedMessage) {
 	}
 
 	log.Infof("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
+}
+
+func (s *Server) handleWinners() {
+	log.Infof("action: sorteo | result: in_progress")
+	bets, err := LoadBets()
+	if err != nil {
+		log.Errorf("action: sorteo | result: fail | error: %s", err)
+		return
+	}
+
+	all_winners := make([]*Bet, 0)
+	for _, bet := range bets {
+		if bet.HasWon() {
+			all_winners = append(all_winners, bet)
+		}
+	}
+
+	success := true
+	for _, client := range s.agencies {
+		agency_winners := make([]string, 0)
+		for _, winner := range all_winners {
+			if winner.agency == client.agency {
+				agency_winners = append(agency_winners, winner.document)
+			}
+		}
+
+		winnersMsg := protocol.MessageWinners{Winners: agency_winners}
+		err := protocol.Send(client.conn, &winnersMsg)
+		if err != nil {
+			s.handleDisconnect(client, err)
+			success = false
+			continue
+		}
+	}
+
+	if success {
+		log.Infof("action: sorteo | result: success")
+	} else {
+		log.Errorf("action: sorteo | result: fail")
+	}
+}
+
+func (s *Server) handleDisconnect(client *Client, err error) {
+	log.Errorf("action: cliente_desconectado | agency: %d", client.agency)
+
+	for i, c := range s.agencies {
+		if c == client {
+			if c.conn != nil {
+				c.conn.Close()
+			}
+			s.agencies = append(s.agencies[:i], s.agencies[i+1:]...)
+		}
+	}
 }
 
 func handleFailedBetBatch(client *Client, bet protocol.MessageBetBatch, err error) {
