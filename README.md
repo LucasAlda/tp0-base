@@ -150,6 +150,25 @@ docker exec server wc bets.csv
 
 ### Ejercicio N°7:
 
+Al igual que en el ejercicio anterior, no hizo falta hacer grandes cambios a la logica del cliente y el servidor, mostrando la robustez de la arquitectura planteada.
+
+En el cliente se deja de cerrar la conexión cuando se termina de enviar las apuestas, sino que esta queda abierta para luego mandarle un `MessageAllBetsSent` y el servidor se encargue de enviarle los ganadores cuando finalice con el resto de agencias.
+
+El servidor continua utilizando el array de `Client` implementado previamente para almacenar los clientes que se conectan.
+Aunque antes era util para manejar la informacion de cada cliente y hacer el graceful shutdown, ahora toma más importancia ya que es necesario para almacenar las conexiones con los clientes ya procesados que estan esperando el resultado de sus apuestas, por lo que ahora en vez de cerrar las conexiones cuando recibe el `MessageAllBetsSent` se guarda en el array de clientes y se continua con el resto de agencias.
+
+El servidor hasta ahora tenia un loop infinito que aceptaba nuevas conexiones y las agregaba al array de clientes, pero como ahora tiene el sorteo final, el for deja de ser infinito y se ejecuta solo para la cantidad de agencias que recibe por configuración `DEFAULT.CANT_AGENCIES` o enviroment `CANT_AGENCIES`.
+
+Para la implementación del sorteo se utilizó una función `GetWinners` que lee el archivo `bets.csv` y utiliza para cada una la funcion `HasWon` y almacena los ganadores. Luego recorre las agencias conectadas y les envia el mensaje `MessageWinners` con el slice de documentos de los ganadores unidos con coma.
+
+```go
+type MessageWinners struct {
+	Winners []string
+}
+```
+
+El cliente recibe el mensaje con los ganadores, lo decodifica y muestra por pantalla.
+
 ## Parte 3: Repaso de Concurrencia
 
 ### Ejercicio N°8:
