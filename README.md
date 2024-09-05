@@ -172,3 +172,26 @@ El cliente recibe el mensaje con los ganadores, lo decodifica y muestra por pant
 ## Parte 3: Repaso de Concurrencia
 
 ### Ejercicio N°8:
+
+Para la implementación de la concurrencia del servidor se utilizó el paquete `sync` de la stdlib de go y las gorutines.
+
+Como hasta ahora teniamos un solo hilo que hacia los siguientes pasos:
+
+- Loop de CANT_AGENCIES
+  - Aceptar y almacenar conexion
+  - Recibir multiples `MessageBetBatch`
+  - Recibir el `MessageAllBetsSent`
+- Sorteo
+- Cerrar las conexiones de las agencias
+
+Se puede ver que la parte que se tiene que hacer concurrentemente es el de recibir los mensajes de las agencias, es decir el cuerpo del loop de CANT_AGENCIES, para esto se a `s.handleConnection` dentro de una gorutine.
+Una vez las agencias se procesan en paralelo, necesitamos una barrera para esperar a que todas las agencias hayan sido procesadas y esten esperando el resultado de sus apuestas. Para esto se utiliza un `sync.WaitGroup` que se utiliza para esperar a que terminen estas gorutines que manejan las agencias y luego proceder al sorteo.
+
+Una vez conseguido paralelizar el procesamiento de las agencias, necesitamos agregar dos mutex para evitar race conditions al entrar en dos secciones criticas:
+
+- La que se encarga de leer y escribir en el archivo `bets.csv`
+- La que se encarga de agregar los clientes a la lista de clientes `s.agencies`
+
+Esto se debe a que la lectura y escritura en el archivo se tiene que hacer de forma exclusiva para no tener problemas con el append al archivo 0 leer justo mientras se escribe, ya que ninguna de estas operaciones esta garantizada como atómica.
+
+Por otro lado, al agregar o eliminar un agente de la lista del servidor, se tiene que asegurar que esta operación se haga de forma exclusiva para no tener problemas con la lista, ya que si dos agentes se agregan o eliminan al mismo tiempo, se puede producir un error.
