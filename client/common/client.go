@@ -84,7 +84,7 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) Cancel() {
-	log.Infof("action: cancelar_conexion | result: success | agency: %v", c.config.ID)
+	log.Debugf("action: cerrar_conexion | result: success | agency: %v", c.config.ID)
 	c.Close()
 }
 
@@ -181,7 +181,6 @@ func (c *Client) batchBets(bets []protocol.MessageBet) []protocol.MessageBetBatc
 		batchs = append(batchs, betsBatch)
 	}
 
-	log.Debugf("Tamaño maximo de apuesta: %d, cantidad de apuestas x batch: %d, cantidad de batchs: %d", maxBetSize, batchSize, len(batchs))
 	return batchs
 }
 

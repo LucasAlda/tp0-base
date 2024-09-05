@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/shared/protocol"
 	"github.com/op/go-logging"
@@ -15,6 +16,7 @@ var log = logging.MustGetLogger("log")
 type Server struct {
 	serverSocket *net.TCPListener
 	agencies     []*Client
+	storeMutex   sync.Mutex
 	cantAgencies int
 	cancelled    bool
 }
@@ -45,6 +47,8 @@ func (s *Server) Close() {
 // finishes, servers starts to accept new connections again
 func (s *Server) Run() {
 	defer s.Close()
+
+	wg := sync.WaitGroup{}
 	for i := 0; i < s.cantAgencies; i++ {
 
 		client, err := s.acceptNewConnection()
@@ -53,8 +57,14 @@ func (s *Server) Run() {
 			return
 		}
 
-		s.handleConnection(client)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.handleConnection(client)
+		}()
 	}
+
+	wg.Wait()
 
 	if !s.cancelled && len(s.agencies) > 0 {
 		s.handleWinners()
@@ -141,7 +151,9 @@ func (s *Server) handleNewBets(client *Client, msg *protocol.ReceivedMessage) {
 		bets = append(bets, b)
 	}
 
+	s.storeMutex.Lock()
 	err = StoreBets(bets)
+	s.storeMutex.Unlock()
 
 	if err != nil {
 		handleFailedBetBatch(client, betsBatchMsg, err)
@@ -160,7 +172,9 @@ func (s *Server) handleNewBets(client *Client, msg *protocol.ReceivedMessage) {
 
 func (s *Server) handleWinners() {
 	log.Infof("action: sorteo | result: in_progress")
+	s.storeMutex.Lock()
 	bets, err := LoadBets()
+	s.storeMutex.Unlock()
 	if err != nil {
 		log.Errorf("action: sorteo | result: fail | error: %s", err)
 		return
