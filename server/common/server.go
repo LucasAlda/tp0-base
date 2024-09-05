@@ -14,11 +14,12 @@ import (
 var log = logging.MustGetLogger("log")
 
 type Server struct {
-	serverSocket *net.TCPListener
-	agencies     []*Client
-	storeMutex   sync.Mutex
-	cantAgencies int
-	cancelled    bool
+	serverSocket  *net.TCPListener
+	agencies      []*Client
+	agenciesMutex sync.Mutex // Mutex para la sección crítica de `agencies`
+	storeMutex    sync.Mutex // Mutex para la sección crítica de la tienda
+	cantAgencies  int
+	cancelled     bool
 }
 
 func NewServer(port int, listenBacklog int, cantAgencies int) (*Server, error) {
@@ -33,11 +34,14 @@ func NewServer(port int, listenBacklog int, cantAgencies int) (*Server, error) {
 func (s *Server) Close() {
 	s.cancelled = true
 	s.serverSocket.Close()
+	s.agenciesMutex.Lock()
 	for _, agency := range s.agencies {
 		if agency != nil {
 			agency.conn.Close()
 		}
 	}
+	s.agencies = []*Client{}
+	s.agenciesMutex.Unlock()
 }
 
 // Dummy Server loop
@@ -52,7 +56,9 @@ func (s *Server) Run() {
 	for i := 0; i < s.cantAgencies; i++ {
 
 		client, err := s.acceptNewConnection()
+		s.agenciesMutex.Lock()
 		s.agencies = append(s.agencies, client)
+		s.agenciesMutex.Unlock()
 		if err != nil {
 			return
 		}
@@ -220,7 +226,9 @@ func (s *Server) handleDisconnect(client *Client, err error) {
 			if c.conn != nil {
 				c.conn.Close()
 			}
+			s.agenciesMutex.Lock()
 			s.agencies = append(s.agencies[:i], s.agencies[i+1:]...)
+			s.agenciesMutex.Unlock()
 		}
 	}
 }
