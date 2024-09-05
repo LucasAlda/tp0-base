@@ -99,5 +99,5 @@ func main() {
 
 	server.Run()
 
-	log.Info("action: close_server | result: success")
+	log.Info("action: cerrar_servidor | result: success")
 }

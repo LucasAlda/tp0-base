@@ -108,6 +108,10 @@ func main() {
 		client.Cancel()
 	}()
 
-	client.SendBets(agencyData)
+	err = client.SendBets(agencyData)
+	if err != nil {
+		return
+	}
+
 	client.GetWinners()
 }

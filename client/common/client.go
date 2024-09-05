@@ -84,15 +84,15 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) Cancel() {
+	log.Infof("action: cancelar_conexion | result: success | agency: %v", c.config.ID)
 	c.Close()
-	log.Debugf("action: cerrar_conexion | result: success | agency: %v", c.config.ID)
 }
 
 func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) SendBets(betsStr [][]string) {
+func (c *Client) SendBets(betsStr [][]string) error {
 	c.createClientSocket()
 
 	bets := c.createBets(betsStr)
@@ -102,11 +102,13 @@ func (c *Client) SendBets(betsStr [][]string) {
 	for _, betsBatch := range batchs {
 		err := c.sendBetBatch(betsBatch)
 		if err != nil {
-			return
+			return err
 		}
 
 		time.Sleep(c.config.Loop.Period)
 	}
+
+	return nil
 }
 
 func (c *Client) GetWinners() {
