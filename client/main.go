@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
 	"fmt"
 	"os"
 	"os/signal"
@@ -59,23 +58,13 @@ func PrintConfig(config *common.Config) {
 	)
 }
 
-func readAgencyFile() ([][]string, error) {
+func getAgencyFile() (*os.File, error) {
 	file, err := os.Open("./agency.csv")
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
-	csvReader := csv.NewReader(file)
-	csvReader.FieldsPerRecord = -1
-
-	data, err := csvReader.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
-
+	return file, nil
 }
 
 func main() {
@@ -91,7 +80,7 @@ func main() {
 	// Print program config with debugging purposes
 	PrintConfig(config)
 
-	agencyData, err := readAgencyFile()
+	betsFile, err := getAgencyFile()
 	if err != nil {
 		log.Criticalf("Error reading agency file: %s", err)
 		return
@@ -108,7 +97,7 @@ func main() {
 		client.Cancel()
 	}()
 
-	err = client.SendBets(agencyData)
+	err = client.SendBets(betsFile)
 	if err != nil {
 		return
 	}

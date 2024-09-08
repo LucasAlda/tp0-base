@@ -1,9 +1,11 @@
 package common
 
 import (
+	"encoding/csv"
 	"errors"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/shared/protocol"
@@ -92,20 +94,51 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) SendBets(betsStr [][]string) error {
+func (c *Client) SendBets(betsFile *os.File) error {
+	defer betsFile.Close()
+
 	c.createClientSocket()
+	betsReader := csv.NewReader(betsFile)
 
-	bets := c.createBets(betsStr)
+	println("Sending bets")
 
-	batchs := c.batchBets(bets)
+	batch := protocol.MessageBetBatch{
+		Bets: make([]protocol.MessageBet, 0),
+	}
+	batchSize := 4 + 4 // 4 bytes for the size and 4 bytes for the type
 
-	for _, betsBatch := range batchs {
-		err := c.sendBetBatch(betsBatch)
+	for {
+		record, err := betsReader.Read()
+		if err == io.EOF {
+			log.Error("Sending ended EOF")
+
+			break
+		}
 		if err != nil {
+			log.Error("Sending ended error", err)
 			return err
 		}
+		bet := protocol.MessageBet{
+			FirstName: record[0],
+			LastName:  record[1],
+			Document:  record[2],
+			Birthdate: record[3],
+			Number:    record[4],
+		}
 
-		time.Sleep(c.config.Loop.Period)
+		if batchSize+bet.GetSize()+1 > 8*1024 || len(batch.Bets) >= c.config.Batch.MaxAmount {
+			err := c.sendBetBatch(&batch)
+			if err != nil {
+				return err
+			}
+
+			batch.Bets = make([]protocol.MessageBet, 0)
+			batchSize = 4 + 4 // 4 bytes for the size + 4 bytes for the type
+			time.Sleep(c.config.Loop.Period)
+		}
+
+		batch.Bets = append(batch.Bets, bet)
+		batchSize += bet.GetSize() + 1
 	}
 
 	return nil
@@ -141,52 +174,9 @@ func (c *Client) GetWinners() {
 	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners.Winners))
 }
 
-func (c *Client) createBets(betsStr [][]string) []protocol.MessageBet {
-	bets := make([]protocol.MessageBet, len(betsStr))
-	for i, betStr := range betsStr {
-		bets[i] = protocol.MessageBet{
-			FirstName: betStr[0],
-			LastName:  betStr[1],
-			Document:  betStr[2],
-			Birthdate: betStr[3],
-			Number:    betStr[4],
-		}
-	}
-	return bets
-}
+func (c *Client) sendBetBatch(batch *protocol.MessageBetBatch) error {
 
-func (c *Client) batchBets(bets []protocol.MessageBet) []protocol.MessageBetBatch {
-	maxBetSize := 0
-	for _, bet := range bets {
-		if bet.GetSize() > maxBetSize {
-			maxBetSize = bet.GetSize()
-		}
-	}
-
-	maxPayloadSize := 8*1024 - 4 - 4 // 8 kB - 4 bytes (size) - 4 bytes (type)
-	batchSize := min(
-		c.config.Batch.MaxAmount,
-		(maxPayloadSize)/(maxBetSize+1), // +1 for the null terminator
-	)
-
-	batchs := make([]protocol.MessageBetBatch, 0)
-
-	for i := 0; i < len(bets); i += batchSize {
-		end := min(i+batchSize, len(bets))
-
-		betsBatch := protocol.MessageBetBatch{
-			Bets: bets[i:end],
-		}
-
-		batchs = append(batchs, betsBatch)
-	}
-
-	return batchs
-}
-
-func (c *Client) sendBetBatch(bet protocol.MessageBetBatch) error {
-
-	err := protocol.Send(c.conn, &bet)
+	err := protocol.Send(c.conn, batch)
 	if err != nil {
 		log.Errorf("action: servidor_desconectado")
 		return err
@@ -198,21 +188,21 @@ func (c *Client) sendBetBatch(bet protocol.MessageBetBatch) error {
 		return err
 	}
 	if err != nil || msg.MessageType != protocol.MessageTypeBetAck {
-		log.Infof("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
+		log.Infof("action: apuesta_enviada | result: fail | cantidad: %d", len(batch.Bets))
 		return err
 	}
 
 	betAck := protocol.MessageBetAck{}
 	err = betAck.Decode(msg.Data)
 	if err != nil {
-		log.Errorf("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
+		log.Errorf("action: apuesta_enviada | result: fail | cantidad: %d", len(batch.Bets))
 		return err
 	}
 
 	if betAck.Result {
-		log.Infof("action: apuesta_enviada | result: success | cantidad: %d", len(bet.Bets))
+		log.Infof("action: apuesta_enviada | result: success | cantidad: %d", len(batch.Bets))
 	} else {
-		log.Errorf("action: apuesta_enviada | result: fail | cantidad: %d", len(bet.Bets))
+		log.Errorf("action: apuesta_enviada | result: fail | cantidad: %d", len(batch.Bets))
 		return errors.New("El servidor no almacenó la apuesta")
 	}
 
