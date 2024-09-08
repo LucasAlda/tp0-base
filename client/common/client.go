@@ -110,12 +110,9 @@ func (c *Client) SendBets(betsFile *os.File) error {
 	for {
 		record, err := betsReader.Read()
 		if err == io.EOF {
-			log.Error("Sending ended EOF")
-
 			break
 		}
 		if err != nil {
-			log.Error("Sending ended error", err)
 			return err
 		}
 		bet := protocol.MessageBet{
